@@ -33,5 +33,9 @@ echo "ansiblemaster ansible_connection = local" >> /etc/ansible/hosts
 echo "[all:vars]" >> /etc/ansible/hosts
 echo "ansible_python_interpreter=/usr/bin/python3" >> /etc/ansible/hosts
 
+## Step 7 Adjust Ansible.cfg
+echo "[defaults]" >> /etc/ansible/ansible.cfg
+echo "inventory = /etc/ansible/hosts" >> /etc/ansible/ansible.cfg
+echo "remote_tmp = /tmp/.ansible/tmp" >> /etc/ansible/ansible.cfg
 
 echo "Ansible installation and basic configuration completed."
