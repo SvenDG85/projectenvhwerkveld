@@ -29,7 +29,7 @@ apt-get install -y ansible
 # Step 6 (Optional): Configure a basic Ansible inventory
 # Uncomment and modify the following lines as needed
 echo "[local]" >> /etc/ansible/hosts
-echo "ansiblemaster ansible_connection = local" >> /etc/ansible/hosts
+echo "ansiblemaster ansible_connection=local" >> /etc/ansible/hosts
 echo "[all:vars]" >> /etc/ansible/hosts
 echo "ansible_python_interpreter=/usr/bin/python3" >> /etc/ansible/hosts
 
