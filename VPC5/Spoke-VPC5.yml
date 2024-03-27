@@ -1,14 +1,14 @@
 - hosts: local
   become: yes
   vars:
-    digital_ocean_token: dop_v1_6680487f8ee3465d7fc8434b21a9b4675eeab19cbb6f5810459e87e85d849635
+    digital_ocean_token: dop_v1_
     droplet_size: s-1vcpu-2gb
     droplet_region: ams3
     vpc_region: ams3
     droplet_image: Ubuntu-22-04-x64
     droplet_inventory_group: spokes
     inventory_file: /etc/ansible/hosts
-    mypubkey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCoBKYUI9yspB708iebN7BUo+E5jQUNa9rDh4hsys99VHajQJo2aRUs14iryd3aICKYF+rwwdKwsf6jFaMCACUXqLA9rB1VCFNlPvYl8tmCCSNbAQPaSX1WHTVy+YVZu1PF2Zr+VzaLIvkTAFwLwiWrKXWCF4COITsczZy/GFCuB8PCiHOkVFfFVyEzhWyCHTWOIyTBMXE6TTs7c7mXOCXmiJnM8fJTU2d8Yo3/wDiktSjoS8a/SWQN4PU4wfRAaXZv9JdK9IAM9c1crf3H/W8lpOowGiUQBokW6Sr6LPKl/B7K8pneXj9Y3krns5SsRWkKIIu+pjnsqU36hgDg3B7n rsa-key-20240217
+    mypubkey: ssh-rsB7K8pneXj9Y3krns5SsRWkKIIu+pjnsqU36hgDg3B7n rsa-key-20240217
     my_project: Deeptoys
     droplets:
       - Spoke-VPC5
