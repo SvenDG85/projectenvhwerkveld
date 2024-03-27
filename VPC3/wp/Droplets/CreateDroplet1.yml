@@ -1,0 +1,94 @@
+- hosts: local
+  become: yes
+  vars:
+    digital_ocean_token: dop_v1_e73206e3ccedfa93f1bfda08fa2c00562b22c177959fc0aa2688e77a692d5389
+    droplet_size: s-1vcpu-2gb
+    droplet_region: ams3
+    vpc_region: ams3
+    droplet_image: Ubuntu-22-04-x64
+    droplet_inventory_group: Wordpress
+    inventory_file: /etc/ansible/hosts
+    my_project: Deeptoys
+    droplets:
+      - WordPress1.deeptoys.be
+
+  tasks:
+#-------Check-SSH-Key-------
+    - name: Check SSH Key
+      user:
+        name: '{{ansible_user_id}}'
+        generate_ssh_key: yes
+        ssh_key_file: .ssh/id_rsa
+
+#-------Add-SSH-Key-To-DO-------      
+    - name: Add SSH Key to Digital Ocean
+      community.digitalocean.digital_ocean_sshkey:
+        ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        api_token: "{{ digital_ocean_token }}"
+        state: present
+      register: sshkey_result
+
+#-------Get VPC ID --------------------
+
+    - name: Create a VPC in DigitalOcean
+      community.digitalocean.digital_ocean_vpc:
+        oauth_token: "{{ digital_ocean_token }}"
+        name: "VPC3"
+        region: "{{ vpc_region }}"
+        ip_range: 10.30.0.0/24
+      register: vpc_info
+
+    - name: Set VPC ID fact
+      set_fact:
+        vpc_id: "{{ vpc_info.data.vpc.id }}"
+
+#-------Create-Droplets-And-Assign-SSH-Key-------     
+    - name: Create Droplet and Assign SSH Key
+      community.digitalocean.digital_ocean_droplet:
+        name: "{{ item }}"
+        vpc_uuid: "{{ vpc_id }}"
+        api_token: "{{ digital_ocean_token }}"
+        size: "{{ droplet_size }}"
+        region: "{{ droplet_region }}"
+        image: "{{ droplet_image }}"
+        project: "{{ my_project }}"
+        unique_name: yes
+        wait_timeout: 600
+        ssh_keys: "{{ sshkey_result.data.ssh_key.id }}"
+        state: active
+      with_items: "{{ droplets }}"
+      register: droplet
+      tags: dropletcreate
+
+    - name: Check if droplets inventory group exists in inventory file
+      shell: grep -x \[{{ droplet_inventory_group }}\] {{ inventory_file }}
+      register: inventory_group
+      tags: inventory_file
+      failed_when: inventory_group.rc == 2
+      changed_when: inventory_group.rc == 0
+      when: inventory_file|length > 0
+
+    - name: Add inventory group to Hosts
+      become: no  
+      lineinfile:
+        dest: "{{ inventory_file }}"
+        line: "[{{ droplet_inventory_group }}]"
+        state: present
+      register: group
+    
+    - name: Add server to Ansible inventory
+      lineinfile:
+        path: "{{ inventory_file }}"
+        insertafter: ^\[{{ droplet_inventory_group }}\]
+        line: "{{ item.item }} ansible_host={{ item.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public') | map(attribute='ip_address') | first }}"
+        create: yes
+      loop: "{{ droplet.results }}"
+      when: droplets is defined
+      tags: dropletcreate
+      become: yes
+      become_user: root
+      no_log: true
+
+
+
+    

@@ -1,0 +1,9 @@
+---
+- import_playbook: /etc/ansible/VPC3/wp/Droplets/CreateDroplet1.yml
+- import_playbook: /etc/ansible/VPC3/wp/Droplets/CreateDroplet2.yml
+- import_playbook: /etc/ansible/VPC3/wp/Droplets/CreateHAProxy1.yml
+
+
+
+      
+

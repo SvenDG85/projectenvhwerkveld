@@ -1,0 +1,7 @@
+---
+- import_playbook: /etc/ansible/VPC3/wp/Wordpress/Installwordpress.yml
+- import_playbook: /etc/ansible/VPC3/wp/Wordpress/ConfigureWP.yml
+- import_playbook: /etc/ansible/VPC3/wp/Wordpress/HaproxyInstall.yml
+- import_playbook: /etc/ansible/VPC3/wp/Wordpress/BackupWPEvery30CleanMonth.yml
+- import_playbook: /etc/ansible/VPC3/wp/Wordpress/ImportBackupFromSpaces.yml
+- import_playbook: /etc/ansible/VPC3/wp/Wordpress/BackupToSecond.yml

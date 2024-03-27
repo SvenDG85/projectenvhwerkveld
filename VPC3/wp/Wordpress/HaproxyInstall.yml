@@ -1,0 +1,86 @@
+- hosts: Proxy.deeptoys.be
+  become: yes 
+
+  tasks:
+
+    - name: Install software-properties-common
+      apt:
+        name: software-properties-common
+        state: present
+
+    - name: Add HAProxy 2.6 PPA repository
+      apt_repository:
+        repo: ppa:vbernat/haproxy-2.6
+        state: present
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install HAProxy
+      apt:
+        name: haproxy
+        state: present
+
+    - name: Install Certbot
+      apt:
+        name: certbot
+        state: present
+
+    - name: Stop HAProxy service
+      systemd:
+        name: haproxy
+        state: stopped
+
+    - name: Generate Let's Encrypt certificate
+      shell: certbot certonly --standalone -d www.deeptoys.be --non-interactive --agree-tos -m sven.degroodt@gmail.com
+      args:
+        creates: /etc/letsencrypt/live/www.deeptoys.be/fullchain.pem
+    
+    - name: Ensure the Let's Encrypt directory exists
+      file:
+        path: /etc/letsencrypt/live/www.deeptoys.be
+        state: directory
+        mode: '0755'
+
+    - name: Concatenate certificates to create a pem file
+      shell: cat /etc/letsencrypt/live/www.deeptoys.be/fullchain.pem /etc/letsencrypt/live/www.deeptoys.be/privkey.pem > /etc/letsencrypt/live/www.deeptoys.be/deeptoys.be.pem
+      args:
+        creates: /etc/letsencrypt/live/www.deeptoys.be/deeptoys.be.pem
+
+    - name: Configure HAProxy
+      blockinfile:
+        path: /etc/haproxy/haproxy.cfg
+        block: |
+            frontend wp-http
+              mode http
+              bind *:80
+              acl is_wordpress hdr(host) -i deeptoys.be
+              acl url_admin path_beg /wp-admin
+              redirect scheme https code 301 if !{ ssl_fc } is_wordpress
+              use_backend wp-www if is_wordpress
+              use_backend admin if url_admin
+
+            frontend wp-https
+              bind *:443 ssl crt /etc/letsencrypt/live/www.deeptoys.be/deeptoys.be.pem
+              acl url_admin path_beg /wp-admin
+              http-request set-header X-Forwarded-Proto https
+              default_backend wp-www
+              use_backend admin if url_admin
+
+            backend admin
+              server wp1 10.30.0.3:80 check
+
+            backend wp-www
+              mode http
+              http-response set-header Content-Security-Policy upgrade-insecure-requests
+              option forwardfor
+              server wp1 10.30.0.3:80 check
+              server wp2 10.30.0.2:80 check
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+
+    - name: Restart and enable HAProxy service
+      systemd:
+        name: haproxy
+        state: restarted
+        enabled: yes

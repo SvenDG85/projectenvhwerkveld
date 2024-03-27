@@ -1,0 +1,135 @@
+- hosts: WordPress1.deeptoys.be,WordPress2.deeptoys.be
+  become: true
+  vars:
+    wp_mysql_db: mywpdb
+    wp_mysql_user: myadmin
+    wp_mysql_password: Admin@1234  # Use Ansible Vault for sensitive data
+    wp_url: "https://www.deeptoys.be"
+    wp_title: "Deeptoys - May there always be pleasure"
+    wp_admin_user: "admin"
+    wp_admin_password: admin@123456  # Use Ansible Vault for sensitive data
+    wp_admin_email: team@deeptoys.be
+    wordpress_path: "/var/www/html/wordpress"
+    root_bin: "/usr/local/bin"
+    wp_cli_path: "{{ root_bin }}/wp"
+    plugins: ["woocommerce", "contact-form-7", "elementor"]  # List of plugins to install and activate
+
+  tasks:
+
+# Ensure correct ownership of WordPress directory
+    - name: Ensure correct ownership of WordPress directory
+      file:
+        path: "{{ wordpress_path }}"
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Ensure WP-CLI cache directory exists
+      file:
+        path: /var/www/.wp-cli/cache
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      become: true
+
+    - name: Check if WP-CLI already exists
+      stat:
+        path: "{{ wp_cli_path }}"
+      register: wpcli_exist
+      become: yes
+
+    - name: Download and install WP-CLI
+      get_url:
+        url: "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+        dest: "{{ wp_cli_path }}"
+        mode: '0755'
+      become: yes
+      when: not wpcli_exist.stat.exists
+
+    - name: Ensure WordPress directories have correct permissions
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        recurse: yes
+      loop:
+        - "{{ wordpress_path }}/wp-content"
+        - "{{ wordpress_path }}/wp-content/upgrade"
+        - "{{ wordpress_path }}/wp-content/plugins"
+        - "{{ wordpress_path }}/wp-content/themes"
+      become: true
+  
+    - name: Copy custom theme ZIP to server
+      copy:
+        src: vibratex.zip
+        dest: /tmp/vibratex.zip
+      become: yes
+
+    - name: Install and activate custom theme from ZIP file
+      command: "{{ wp_cli_path }} theme install /tmp/vibratex.zip --activate"
+      args:
+        chdir: "{{ wordpress_path }}"
+      become: yes
+      become_user: www-data
+
+    - name: Remove the theme ZIP file
+      file:
+        path: /tmp/vibratex.zip
+        state: absent
+      become: yes
+    
+    - name: Create a directory 
+      ansible.builtin.file:
+        path: /tmp/wordpress
+        state: directory
+        mode: '0755' # optional, sets the permission of the directory
+
+    # Add tasks for importing backup
+    - name: Copy WordPress backup ZIP to server
+      copy:
+        src: wordpress.zip
+        dest: /tmp/wordpress.zip
+      become: yes
+
+    - name: Ensure unzip is installed (Debian/Ubuntu)
+      apt:
+        name: unzip
+        state: present
+      become: yes
+
+    - name: Unzip WordPress backup files
+      ansible.builtin.unarchive:
+        src: /tmp/wordpress.zip
+        dest: "{{ wordpress_path }}"
+        remote_src: yes
+        owner: www-data
+        group: www-data
+      become: yes
+
+    # Your existing task to import WordPress database backup
+    - name: Import WordPress database backup
+      command: "{{ wp_cli_path }} db import {{ wordpress_path }}/wordpress_db.sql --path={{ wordpress_path }}" # Update the path according to actual location inside the ZIP
+      become: yes
+      become_user: www-data
+
+    # Your existing task to remove the WordPress database backup file
+    - name: Remove the WordPress database backup file
+      file:
+        path: /var/www/html/wordpress/wordpress_db.sql # Ensure this matches the actual path or consider removing the unzipped directory
+        state: absent
+      become: yes
+
+    # Add a task to clean up the ZIP file after unzipping
+    - name: Remove the WordPress backup ZIP file
+      file:
+        path: /tmp/wordpress.zip
+        state: absent
+      become: yes
+
+  handlers:
+    - name: restart mysql
+      service:
+        name: mysql
+        state: restarted

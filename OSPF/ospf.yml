@@ -1,0 +1,59 @@
+---
+- name: Install and configure BIRD 2 on nodes
+  hosts: hubserver,spokes
+  become: yes
+
+  tasks:
+    - name: Install BIRD 2
+      apt:
+        name: bird2
+        state: latest
+
+    - name: Move existing bird.conf to bird.conf.org
+      command: mv /etc/bird/bird.conf /etc/bird/bird.conf.org
+      args:
+        removes: /etc/bird/bird.conf
+
+    - name: Deploy customized bird.conf
+      template:
+        src: "{{ inventory_hostname }}_bird.conf.j2"
+        dest: /etc/bird/bird.conf
+
+    - name: Change ownership of bird.conf
+      file:
+        path: /etc/bird/bird.conf
+        owner: bird
+        group: bird
+
+    - name: Configure BIRD using birdc
+      command: birdc configure
+
+- name: Install Bird localhost
+  hosts: local
+  become: yes 
+
+  tasks:
+
+    - name: Install BIRD 2
+      apt:
+        name: bird2
+        state: latest
+
+    - name: Move existing bird.conf to bird.conf.org
+      command: mv /etc/bird/bird.conf /etc/bird/bird.conf.org
+      args:
+        removes: /etc/bird/bird.conf
+
+    - name: Deploy customized bird.conf
+      template:
+        src: "Spoke-VPC1_bird.conf.j2"
+        dest: /etc/bird/bird.conf
+
+    - name: Change ownership of bird.conf
+      file:
+        path: /etc/bird/bird.conf
+        owner: bird
+        group: bird
+
+    - name: Configure BIRD using birdc
+      command: birdc configure

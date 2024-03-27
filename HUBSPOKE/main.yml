@@ -1,0 +1,5 @@
+---
+- import_playbook: /etc/ansible/VPC4/CreateHub.yml
+- import_playbook: /etc/ansible/VPC5/Spoke-VPC5.yml
+- import_playbook: /etc/ansible/VPC3/Spoke-VPC3.yml
+- import_playbook: /etc/ansible/VPC2/Spoke-VPC2.yml

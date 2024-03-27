@@ -1,0 +1,59 @@
+- name: Import WordPress backup from DigitalOcean Spaces to another server
+  hosts: WordPress1.deeptoys.be
+  become: yes
+  vars:
+    spaces_access_key: "DO00DH84RGBMUHLMPFDL"  # Access key for DigitalOcean Spaces
+    spaces_secret_key: "Sb3Jnj8taK3jCD1xvCKjurp7owSW+FB6YtCAb9CeE7k"  # Secret key for DigitalOcean Spaces (consider using Ansible Vault for security)
+    space_name: "deeptoys-backup"
+    space_region: "ams3"
+    wp_path: "/var/www/html/wordpress"
+    backup_path: "/backup/wordpress"
+    db_name: "mywpdb"
+    db_user: "myadmin"
+    db_password: "Admin@1234"
+
+  tasks:
+    - name: Ensure zip and s3cmd are installed
+      apt:
+        name:
+          - zip
+          - s3cmd
+        state: present
+        update_cache: yes
+
+    - name: Configure s3cmd
+      copy:
+        dest: "/root/.s3cfg"
+        content: |
+          [default]
+          access_key = {{ spaces_access_key }}
+          secret_key = {{ spaces_secret_key }}
+          use_https = True
+          host_base = {{ space_region }}.digitaloceanspaces.com
+          host_bucket = %(bucket)s.{{ space_region }}.digitaloceanspaces.com
+        mode: '0600'
+
+    - name: Create script to import latest backup
+      copy:
+        dest: "/usr/local/bin/import_backup.sh"
+        content: |
+          #!/bin/bash
+          # Sync backup from DigitalOcean Spaces
+          s3cmd sync s3://{{ space_name }}/{{ space_region }}/ {{ backup_path }}/
+          # Find the latest WordPress backup file and unzip
+          LATEST_WP_BACKUP=$(ls -Art {{ backup_path }}/wordpress_backup_*.zip | tail -n 1)
+          unzip -o $LATEST_WP_BACKUP -d {{ wp_path }}
+          # Find the latest WordPress DB backup file, unzip and restore
+          LATEST_DB_BACKUP=$(ls -Art {{ backup_path }}/db/wordpress_db_*.sql.zip | tail -n 1)
+          unzip -o $LATEST_DB_BACKUP -d {{ backup_path }}/db
+          DB_BACKUP_FILE=$(echo $LATEST_DB_BACKUP | sed 's/.zip$//')
+          mysql -u {{ db_user }} -p'{{ db_password }}' {{ db_name }} < $DB_BACKUP_FILE
+        mode: '0755'
+
+    - name: Schedule the import backup script to run every 35 minutes
+      cron:
+        name: "Import WordPress Backup"
+        user: root
+        job: "/usr/local/bin/import_backup.sh > /var/log/import_backup.log 2>&1"
+        minute: "*/35"
+        hour: "*"

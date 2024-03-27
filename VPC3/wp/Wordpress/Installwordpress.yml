@@ -1,0 +1,164 @@
+- hosts: WordPress1.deeptoys.be,WordPress2.deeptoys.be
+  become: true
+  vars:
+    wp_mysql_db: mywpdb
+    wp_mysql_user: myadmin
+    wp_mysql_password: Admin@1234  # Use Ansible Vault for sensitive data
+    wp_url: "https://www.deeptoys.be"
+    wp_title: "Deeptoys - May there always be pleasure"
+    wp_admin_user: "admin"
+    wp_admin_password: admin@123456  # Use Ansible Vault for sensitive data
+    wp_admin_email: team@deeptoys.be
+    wordpress_path: "/var/www/html/wordpress"
+    root_bin: "/usr/local/bin"
+    wp_cli_path: "{{ root_bin }}/wp"
+    plugins: ["woocommerce", "contact-form-7", "elementor"]  # List of plugins to install and activate
+
+  tasks:
+    - name: Update apt cache
+      apt: update_cache=yes cache_valid_time=3600
+      become: yes
+
+    - name: Install Software for server role
+      apt:
+        name: ['apache2', 'python3-dev', 'python3-pip', 'php8.1-mysql', 'php', 'libapache2-mod-php', 'python3-mysqldb', 'php8.1-zip', 'mysql-server']
+        state: present
+      become: yes
+    
+    - name: Create mysql database
+      mysql_db:
+        name: '{{ wp_mysql_db }}'
+        state: present
+      become: yes
+
+    - name: Create mysql user
+      mysql_user:
+        name: '{{ wp_mysql_user }}'
+        password: '{{ wp_mysql_password }}'
+        priv: '*.*:ALL'
+        state: present
+      become: yes
+
+    - name: Enable Apache Rewrite Module
+      ansible.builtin.shell: a2enmod rewrite
+      become: yes
+
+    - name: Adjust max upload filesize in php.ini
+      ansible.builtin.lineinfile:
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: '^upload_max_filesize ='
+        line: 'upload_max_filesize = 256M'
+      become: yes
+
+    - name: Adjust post max size in php.ini
+      ansible.builtin.lineinfile:
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: '^post_max_size ='
+        line: 'post_max_size = 256M'
+      become: yes
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+        enabled: yes
+
+    - name: Install PHP extensions
+      apt:
+        name: ['php-gd', 'php-ssh2']
+        state: present
+      become: yes
+
+    - name: Replace 000-default.conf with custom configuration
+      copy:
+        dest: /etc/apache2/sites-enabled/000-default.conf
+        content: |
+          <VirtualHost *:80>
+              ServerAdmin webmaster@yourdomain.com
+              DocumentRoot /var/www/html/wordpress
+              ServerName www.deeptoys.be
+
+              <Directory /var/www/html/wordpress>
+                  AllowOverride All
+                  Order allow,deny
+                  allow from all
+                  Require all granted
+              </Directory>
+
+              ErrorLog ${APACHE_LOG_DIR}/wordpress-error.log
+              CustomLog ${APACHE_LOG_DIR}/wordpress-access.log combined
+          </VirtualHost>
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - restart apache
+
+    - name: Change ownership of WordPress directory
+      ansible.builtin.file:
+        path: /var/www/html/wordpress
+        owner: www-data
+        group: www-data
+        recurse: yes
+      become: yes
+
+    - name: Create .htaccess file with custom upload limit
+      copy: 
+        dest: /var/www/html/wordpress/.htaccess
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          php_value upload_max_filesize 256M
+      become: yes
+
+    - name: Check if WP-CLI already exists
+      stat:
+        path: "{{ wp_cli_path }}"
+      register: wpcli_exist
+      become: yes
+
+    - name: Download and install WP-CLI
+      get_url:
+        url: "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+        dest: "{{ wp_cli_path }}"
+        mode: '0755'
+      become: yes
+      when: not wpcli_exist.stat.exists
+
+    - name: Ensure /var/www/html/ exists and has correct permissions
+      file:
+        path: /var/www/html/
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      become: yes
+
+    - name: Check if WordPress is already installed
+      stat:
+        path: "{{ wordpress_path }}/wp-config.php"
+      register: wordpress_installed
+      become: yes
+
+    - name: Download WordPress
+      command: "{{ wp_cli_path }} core download --path={{ wordpress_path }} --allow-root"
+      become: yes
+      become_user: www-data
+      when: not wordpress_installed.stat.exists
+
+    - name: Create wp-config.php
+      command: "{{ wp_cli_path }} config create --dbname={{ wp_mysql_db }} --dbuser={{ wp_mysql_user }} --dbpass={{ wp_mysql_password }} --path={{ wordpress_path }} --allow-root"
+
+    - name: Install WordPress Core
+      command: "{{ wp_cli_path }} core install --url={{ wp_url }} --title='{{ wp_title }}' --admin_user={{ wp_admin_user }} --admin_password={{ wp_admin_password }} --admin_email={{ wp_admin_email }}"
+      args:
+        chdir: "{{ wordpress_path }}"
+      become: yes
+      become_user: www-data
+
+  handlers:
+    - name: restart apache
+      service:
+        name: apache2
+        state: restarted

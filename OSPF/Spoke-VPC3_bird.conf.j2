@@ -1,0 +1,19 @@
+router id 169.254.0.4;
+
+protocol device {};
+
+protocol ospf myospf {
+    area 0 {
+        interface "wg0" {};
+        interface "eth1" {
+            stub;
+        };
+    };
+}
+
+protocol kernel {
+    ipv4 {
+        import none;
+        export all;
+    };
+}

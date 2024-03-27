@@ -1,0 +1,157 @@
+- name: Configure WireGuard (Hub)
+  hosts: HUB-VPC4
+  become: yes
+  tasks:
+    - name: Deploy wg0.conf on Hub
+      template:
+        src: HUB-VPC4_wg0.conf.j2
+        dest: /etc/wireguard/wg0.conf
+#Spoke-VPC1
+    - name: Bring up wg0 interface on Hub
+      shell: |
+        if ip link show wg0 > /dev/null 2>&1; then
+          echo "wg0 already exists"
+        else
+          ip link add dev wg0 type wireguard
+          ip a add 169.254.0.1 peer 169.254.0.2 dev wg0
+          ip -br a s dev wg0
+          wg setconf wg0 /etc/wireguard/wg0.conf
+          ip link set wg0 up
+        fi
+
+#Spoke-VPC2
+    - name: Deploy wg1.conf on Hub
+      template:
+        src: HUB-VPC4_wg1.conf.j2
+        dest: /etc/wireguard/wg1.conf
+
+    - name: Bring up wg1 interface on Hub
+      shell: |
+        if ip link show wg1 > /dev/null 2>&1; then
+          echo "wg1 already exists"
+        else
+          ip link add dev wg1 type wireguard
+          ip a add 169.254.0.1 peer 169.254.0.3 dev wg1
+          ip -br a s dev wg1
+          wg setconf wg1 /etc/wireguard/wg1.conf
+          ip link set wg1 up
+        fi
+
+#Spoke-VPC3
+    - name: Deploy wg2.conf on Hub
+      template:
+        src: HUB-VPC4_wg2.conf.j2
+        dest: /etc/wireguard/wg2.conf
+
+    - name: Bring up wg1 interface on Hub
+      shell: |
+        if ip link show wg2 > /dev/null 2>&1; then
+          echo "wg2 already exists"
+        else
+          ip link add dev wg2 type wireguard
+          ip a add 169.254.0.1 peer 169.254.0.4 dev wg2
+          ip -br a s dev wg2
+          wg setconf wg2 /etc/wireguard/wg2.conf
+          ip link set wg2 up
+        fi
+
+#Spoke-VPC5
+    - name: Deploy wg3.conf on Hub
+      template:
+        src: HUB-VPC4_wg3.conf.j2
+        dest: /etc/wireguard/wg3.conf
+
+    - name: Bring up wg3 interface on Hub
+      shell: |
+        if ip link show wg3 > /dev/null 2>&1; then
+          echo "wg3 already exists"
+        else
+          ip link add dev wg3 type wireguard
+          ip a add 169.254.0.1 peer 169.254.0.5 dev wg3
+          ip -br a s dev wg3
+          wg setconf wg3 /etc/wireguard/wg3.conf
+          ip link set wg3 up
+        fi
+
+#Spoke-VPC1
+- name: Configure WireGuard (Spokes)
+  hosts: local
+  become: yes
+  tasks:
+    - name: Deploy wg0.conf on Spokes
+      template:
+        src: Spoke-VPC1_wg0.conf.j2
+        dest: /etc/wireguard/wg0.conf
+
+    - name: Bring up wg0 interface on Spokes
+      shell: |
+        ip link add dev wg0 type wireguard
+        ip a add 169.254.0.2 peer 169.254.0.1 dev wg0
+        ip -br a s dev wg0
+        wg setconf wg0 /etc/wireguard/wg0.conf
+        ip link set wg0 up
+
+#Spoke-VPC2
+- name: Configure WireGuard (Spokes)
+  hosts: Spoke-VPC2
+  become: yes
+  tasks:
+    - name: Deploy wg0.conf on Spokes
+      template:
+        src: Spoke-VPC2_wg0.conf.j2
+        dest: /etc/wireguard/wg0.conf
+
+    - name: Bring up wg0 interface on Spokes
+      shell: |
+        ip link add dev wg0 type wireguard
+        ip a add 169.254.0.3 peer 169.254.0.1 dev wg0
+        ip -br a s dev wg0
+        wg setconf wg0 /etc/wireguard/wg0.conf
+        ip link set wg0 up  
+
+#Spoke-VPC3
+- name: Configure WireGuard (Spokes)
+  hosts: Spoke-VPC3
+  become: yes
+  tasks:
+    - name: Deploy wg0.conf on Spokes
+      template:
+        src: Spoke-VPC3_wg0.conf.j2
+        dest: /etc/wireguard/wg0.conf
+
+    - name: Bring up wg0 interface on Spokes
+      shell: |
+        ip link add dev wg0 type wireguard
+        ip a add 169.254.0.4 peer 169.254.0.1 dev wg0
+        ip -br a s dev wg0
+        wg setconf wg0 /etc/wireguard/wg0.conf
+        ip link set wg0 up
+
+#Spoke-VPC5
+- name: Configure WireGuard (Spokes)
+  hosts: Spoke-VPC5
+  become: yes
+  tasks:
+    - name: Deploy wg0.conf on Spokes
+      template:
+        src: Spoke-VPC5_wg0.conf.j2
+        dest: /etc/wireguard/wg0.conf
+
+    - name: Bring up wg0 interface on Spokes
+      shell: |
+        ip link add dev wg0 type wireguard
+        ip a add 169.254.0.5 peer 169.254.0.1 dev wg0
+        ip -br a s dev wg0
+        wg setconf wg0 /etc/wireguard/wg0.conf
+        ip link set wg0 up   
+
+- name: Enable IP Forwarding on all nodes
+  hosts: hubserver,spokes,local
+  become: yes
+  tasks:
+    - name: Enable IP forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes

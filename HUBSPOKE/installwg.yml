@@ -1,0 +1,46 @@
+---
+- name: Setup WireGuard VPN (Hub & Spokes)
+  hosts: hubserver,spokes,local
+  become: yes
+
+  tasks:
+    - name: Update and upgrade system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install WireGuard
+      apt:
+        name: wireguard
+        state: latest
+
+    - name: Generate WireGuard keys
+      shell: |
+        cd /etc/wireguard
+        umask 077
+        wg genkey | tee privatekey | wg pubkey > publickey
+      args:
+        creates: /etc/wireguard/privatekey
+
+    - name: Gather public keys from all nodes
+      shell: cat /etc/wireguard/publickey
+      register: wireguard_public_key
+      changed_when: false
+
+    - name: Fetch the public key
+      slurp:
+        src: /etc/wireguard/publickey
+      register: wg_public_key
+
+    - name: Print the public key
+      debug:
+        msg: "Public Key for {{ inventory_hostname }}: {{ wg_public_key['content'] | b64decode }}"
+
+    - name: Fetch Private Key
+      slurp:
+        src: /etc/wireguard/privatekey
+      register: wg_private_key
+    
+    - name: Print Private keys
+      debug:
+        msg: "Private Key for {{ inventory_hostname }}: {{ wg_private_key['content'] | b64decode }}"
