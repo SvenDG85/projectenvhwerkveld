@@ -1,7 +1,7 @@
 - hosts: local
   become: yes
   vars:
-    digital_ocean_token: dop_v1_e73206e3ccedfa93f1bfda08fa2c00562b22c177959fc0aa2688e77a692d5389
+    digital_ocean_token: dop_v1_e
     droplet_size: s-1vcpu-2gb
     droplet_region: ams3
     vpc_region: ams3
